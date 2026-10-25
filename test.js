@@ -782,6 +782,42 @@ test.serial('randomize affects retry delays', async t => {
 	t.deepEqual(captured, [100, 200, 150]);
 });
 
+test.serial('does not retry after maxRetryTime is exhausted during the delay', async t => {
+	const originalPerformanceNow = performance.now;
+	const originalSetTimeout = globalThis.setTimeout;
+	let now = 0;
+	const delays = [];
+
+	performance.now = () => now;
+	globalThis.setTimeout = (function_, milliseconds) => {
+		delays.push(milliseconds);
+		return originalSetTimeout(() => {
+			now += milliseconds;
+			function_();
+		}, 0);
+	};
+
+	t.teardown(() => {
+		performance.now = originalPerformanceNow;
+		globalThis.setTimeout = originalSetTimeout;
+	});
+
+	let attempts = 0;
+	const error = new Error('operation failed');
+
+	await t.throwsAsync(pRetry(() => {
+		attempts++;
+		throw error;
+	}, {
+		retries: 5,
+		minTimeout: 100,
+		maxRetryTime: 50,
+	}), {is: error});
+
+	t.deepEqual(delays, [50]);
+	t.is(attempts, 1);
+});
+
 test('maxRetryTime limits total retry duration', async t => {
 	const start = Date.now();
 	const maxRetryTime = 1000;

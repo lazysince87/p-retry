@@ -194,6 +194,10 @@ async function onAttemptFailure({error, attemptNumber, retriesConsumed, startTim
 
 	options.signal?.throwIfAborted();
 
+	if (calculateRemainingTime(startTime, maxRetryTime) <= 0) {
+		throw normalizedError;
+	}
+
 	return true;
 }
 
